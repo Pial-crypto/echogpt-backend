@@ -1,15 +1,214 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum RoleName {
+  USER
+  ADMIN
+}
+
+enum SubscriptionPlan {
+  FREE
+  PREMIUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+}
+
+enum ProviderType {
+  OPENAI
+  ANTHROPIC
+  GEMINI
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum SearchStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  firstName    String?
+  lastName     String?
+  isVerified   Boolean   @default(false)
+  isActive     Boolean   @default(true)
+
+  roleId       String
+  role         Role      @relation(fields: [roleId], references: [id])
+
+  sessions     Session[]
+  subscription Subscription?
+  chats        Chat[]
+  searches     WebSearch[]
+  usageLogs    ApiUsageLog[]
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([roleId])
+  @@index([email])
+}
+
+model Role {
+  id        String     @id @default(uuid())
+  name      RoleName   @unique
+  users     User[]
+
+  createdAt DateTime   @default(now())
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  refreshToken String   @unique
+  expiresAt    DateTime
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Subscription {
+  id               String             @id @default(uuid())
+  userId           String             @unique
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  plan             SubscriptionPlan   @default(FREE)
+  status           SubscriptionStatus @default(ACTIVE)
+
+  requestLimit     Int                @default(50)
+  requestsUsed     Int                @default(0)
+
+  startedAt        DateTime           @default(now())
+  expiresAt        DateTime?
+
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([plan])
+  @@index([status])
+}
+
+model AIProvider {
+  id            String       @id @default(uuid())
+  name          String
+  type          ProviderType
+  apiKey        String
+  baseUrl       String?
+  defaultModel  String?
+  isEnabled     Boolean      @default(true)
+  isDefault     Boolean      @default(false)
+
+  chats         Chat[]
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@unique([name])
+  @@index([type])
+  @@index([isEnabled])
+}
+
+model Chat {
+  id          String      @id @default(uuid())
+
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  providerId  String?
+  provider    AIProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+
+  title       String?
+  model       String?
+
+  messages    ChatMessage[]
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([providerId])
+  @@index([createdAt])
+}
+
+model ChatMessage {
+  id          String    @id @default(uuid())
+
+  chatId      String
+  chat        Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  role        ChatRole
+  content     String
+
+  tokenCount  Int?
+  createdAt   DateTime  @default(now())
+
+  @@index([chatId])
+  @@index([createdAt])
+}
+
+model WebSearch {
+  id          String       @id @default(uuid())
+
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  query       String
+  status      SearchStatus @default(PENDING)
+
+  results     Json?
+  resultCount Int?
+
+  createdAt   DateTime     @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([query])
+}
+
+model ApiUsageLog {
+  id           String   @id @default(uuid())
+
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  endpoint     String
+  method       String
+  statusCode   Int
+  provider     String?
+  model        String?
+
+  tokensUsed   Int?
+  responseTime Int?
+
+  ipAddress    String?
+  userAgent    String?
+
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([endpoint])
+  @@index([createdAt])
+  @@index([statusCode])
 }
