@@ -8,6 +8,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module.js';
 import { ProvidersModule } from './providers/providers.module.js';
 import { AdminModule } from './admin/admin.module.js';
 import { ChatModule } from './chat/chat.module.js';
+import { SearchModule } from './search/search.module.js';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ChatModule } from './chat/chat.module.js';
     ProvidersModule,
     AdminModule,
     ChatModule,
+    SearchModule,
   ],
 })
 export class AppModule {}
