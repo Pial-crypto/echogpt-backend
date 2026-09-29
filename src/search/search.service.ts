@@ -1,22 +1,17 @@
-import {
-  Injectable,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service.js';
 import { SearchDto } from './dto/search.dto.js';
+import { TavilyService } from './tavily.service.js';
 
 @Injectable()
 export class SearchService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly tavilyService: TavilyService,
   ) {}
 
-  async search(
-    userId: string,
-    dto: SearchDto,
-  ) {
-    const startTime = Date.now();
-
+  async search(userId: string, dto: SearchDto) {
     const search = await this.prisma.webSearch.create({
       data: {
         userId,
@@ -26,42 +21,31 @@ export class SearchService {
     });
 
     try {
-
-
-      const results = await this.performSearch(
+      const searchResult = await this.performSearch(
         dto.query,
         dto.limit ?? 10,
       );
 
-      const updated =
-        await this.prisma.webSearch.update({
-          where: {
-            id: search.id,
-          },
-          data: {
-            status: 'COMPLETED',
-            results,
-            resultCount: results.length,
-          },
-        });
+      const results = searchResult.results;
+      const resultCount = searchResult.resultCount;
 
-      await this.prisma.apiUsageLog.create({
+      const updated = await this.prisma.webSearch.update({
+        where: {
+          id: search.id,
+        },
         data: {
-          userId,
-          endpoint: '/api/search',
-          method: 'POST',
-          statusCode: 200,
-          responseTime:
-            Date.now() - startTime,
+          status: 'COMPLETED',
+          results,
+          resultCount,
         },
       });
 
       return {
         id: updated.id,
         query: updated.query,
+        answer: searchResult.answer,
         results,
-        resultCount:
-          updated.resultCount,
+        resultCount: updated.resultCount,
         createdAt: updated.createdAt,
       };
     } catch (error) {
@@ -74,17 +58,6 @@ export class SearchService {
         },
       });
 
-      await this.prisma.apiUsageLog.create({
-        data: {
-          userId,
-          endpoint: '/api/search',
-          method: 'POST',
-          statusCode: 500,
-          responseTime:
-            Date.now() - startTime,
-        },
-      });
-
       throw error;
     }
   }
@@ -94,13 +67,10 @@ export class SearchService {
       where: {
         userId,
       },
-
       orderBy: {
         createdAt: 'desc',
       },
-
       take: 50,
-
       select: {
         id: true,
         query: true,
@@ -117,13 +87,10 @@ export class SearchService {
         userId,
         status: 'COMPLETED',
       },
-
       orderBy: {
         createdAt: 'desc',
       },
-
       take: 10,
-
       select: {
         id: true,
         query: true,
@@ -137,37 +104,34 @@ export class SearchService {
     userId: string,
     query?: string,
   ) {
-    const searches =
-      await this.prisma.webSearch.findMany({
-        where: {
-          userId,
+    const searches = await this.prisma.webSearch.findMany({
+      where: {
+        userId,
 
-          ...(query
-            ? {
-                query: {
-                  contains: query,
-                  mode: 'insensitive',
-                },
-              }
-            : {}),
-        },
+        ...(query
+          ? {
+              query: {
+                contains: query,
+                mode: 'insensitive',
+              },
+            }
+          : {}),
+      },
 
-        select: {
-          query: true,
-        },
+      select: {
+        query: true,
+      },
 
-        orderBy: {
-          createdAt: 'desc',
-        },
+      orderBy: {
+        createdAt: 'desc',
+      },
 
-        take: 20,
-      });
+      take: 20,
+    });
 
     const uniqueQueries = [
       ...new Set(
-        searches.map(
-          (search) => search.query,
-        ),
+        searches.map((search) => search.query),
       ),
     ];
 
@@ -180,22 +144,15 @@ export class SearchService {
     query: string,
     limit: number,
   ) {
-    /*
-     * Temporary development implementation.
-     *
-     * Replace this method with a real web-search
-     * provider such as Tavily, Serper, Bing, etc.
-     */
+    const result = await this.tavilyService.search(
+      query,
+      limit,
+    );
 
-    return [
-      {
-        title: `Search result for: ${query}`,
-        url: `https://www.google.com/search?q=${encodeURIComponent(
-          query,
-        )}`,
-        snippet:
-          'Web search provider integration can be connected here.',
-      },
-    ].slice(0, limit);
+    return {
+      answer: result.answer,
+      results: result.results,
+      resultCount: result.results.length,
+    };
   }
 }
