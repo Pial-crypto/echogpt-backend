@@ -9,7 +9,9 @@ import { ProvidersModule } from './providers/providers.module.js';
 import { AdminModule } from './admin/admin.module.js';
 import { ChatModule } from './chat/chat.module.js';
 import { SearchModule } from './search/search.module.js';
-
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { UsageLoggingInterceptor } from './common/utils/interceptors/usage-logging.interceptor.js';
+// import { UsageLoggingInterceptor } from './common/interceptors/usage-logging.interceptor';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -25,5 +27,11 @@ import { SearchModule } from './search/search.module.js';
     ChatModule,
     SearchModule,
   ],
+  providers: [
+  {
+    provide: APP_INTERCEPTOR,
+    useClass: UsageLoggingInterceptor,
+  },
+],
 })
 export class AppModule {}
