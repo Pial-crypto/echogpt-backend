@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { describe, beforeAll, afterAll, it } from 'vitest';
 
-import { AppModule } from '../src/app.module';
+import { AppModule } from '../src/app.module.js';
 
 describe('App (e2e)', () => {
   let app: INestApplication;
